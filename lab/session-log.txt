@@ -1,0 +1,102 @@
+SESSION LOG — MCP Lab Server Build
+Date: 2026-04-05
+================================================================================
+
+GOAL
+----
+Build an MCP server using the MCP SDK and Anthropic SDK, register it with
+Claude Code, and verify it works.
+
+================================================================================
+SETUP & FILE STRUCTURE
+================================================================================
+
+Project root: /workspaces/mcpAgentLab
+Lab directory: /workspaces/mcpAgentLab/lab
+
+Final file structure:
+  lab/
+    server.js           # MCP server entry point
+    logger.js           # Logging utility (moved from tools/)
+    tools/
+      compute.js        # calculate, convert_units tools
+      filesystem.js     # read_file, write_file, list_directory tools
+      web.js            # http_get tool
+      system.js         # system_info tool
+    node_modules/       # lab-specific dependencies
+
+================================================================================
+KEY COMMANDS RUN
+================================================================================
+
+# Test tools/list
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+| node server.js 2>/dev/null | jq '.result.tools[].name'
+
+# Test calculate tool
+echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"calculate","arguments":{"expression":"Math.sqrt(625)+100"}}}' \
+| node server.js 2>/dev/null | jq '.result.content[0].text'
+
+# Register MCP server with Claude Code
+claude mcp add mcp-lab-server node /workspaces/mcpAgentLab/lab/server.js
+
+# Verify registration
+claude mcp list
+
+================================================================================
+RESULTS
+================================================================================
+
+tools/list output:
+  "calculate"
+  "convert_units"
+  "read_file"
+  "write_file"
+  "list_directory"
+  "http_get"
+  "system_info"
+
+calculate output:
+  "Math.sqrt(625)+100 = 125"
+
+MCP server registered to: /home/node/.claude.json (project scope)
+
+================================================================================
+BUGS FIXED
+================================================================================
+
+1. MISSING tools/ DIRECTORY
+   - tools/ was at /workspaces/mcpAgentLab/tools/ (root level)
+   - server.js imported from ./tools/ (relative to lab/)
+   - Fix: copied tools into lab/tools/ so all deps resolve from lab/node_modules
+
+2. WRONG LOGGER IMPORT PATH
+   - Tools imported from '../lib/logger.js' — lib/ didn't exist
+   - Fix: updated to './logger.js' (then later '../logger.js' after logger
+     was moved to lab/)
+
+3. ZOD VERSION MISMATCH (_zod error)
+   - Tools used 'import { z } from "zod"' (Zod v4 classic)
+   - MCP SDK (v1.29.0) uses zod/v4-mini's toJSONSchema internally
+   - z.record(z.string()) without a key type crashes toJSONSchema
+   - Fix 1: switched tools to 'import { z } from "zod/v4"'
+   - Fix 2: changed z.record(z.string()) to z.record(z.string(), z.string())
+
+4. claude_desktop_config.json NOT USED BY CLAUDE CODE
+   - Manually editing ~/.claude/claude_desktop_config.json has no effect
+   - Fix: use 'claude mcp add' CLI command instead
+   - Config is saved to /home/node/.claude.json for the project
+
+================================================================================
+TOOLS REGISTERED
+================================================================================
+
+calculate        — Evaluate a JS math expression safely
+convert_units    — Convert between length, weight, temp, data units
+read_file        — Read a file from ~/lab/
+write_file       — Write a file to ~/lab/
+list_directory   — List contents of a directory in ~/lab/
+http_get         — Perform an HTTP GET request
+system_info      — Return OS, CPU, memory, Node version, uptime
+
+================================================================================
