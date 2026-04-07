@@ -23,6 +23,20 @@ export function registerComputeTools(server) {
       }
     }
   );
+//
+  server.tool(
+    "convert_units",
+    "Convert between units",
+    {
+        // This will fix the error by turning "10" into 10 automatically
+        value: z.coerce.number().describe("The numeric value to convert"),
+        from_unit: z.string(),
+        to_unit: z.string()
+    },
+    async ({ value, from_unit, to_unit }) => {
+        // value is now guaranteed to be a number here
+    }
+);
 
   // Tool 2: Unit Converter
   server.tool(
