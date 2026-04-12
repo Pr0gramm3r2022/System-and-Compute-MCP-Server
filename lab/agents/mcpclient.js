@@ -6,11 +6,22 @@ import { runAgentLoop } from './agent_loop.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_PATH = resolve(__dirname, '/workspaces/mcpAgentLab/lab/agents/server.js');
+
+const transportpm = new StdioClientTransport({
+  command: 'node',
+  args: ['/workspaces/mcpAgentLab/lab/agents']
+});
  
 // Connect to MCP server
 const transport = new StdioClientTransport({
   command: 'node',
-  args: [join(homedir(),'lab','mcp-server','server.js')]
+  args: [join(homedir(),'lab','server.js')]
 });
 const mcpClient = new Client({ name:'mcp-agent', version:'1.0.0' });
 await mcpClient.connect(transport);
