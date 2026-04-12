@@ -1,0 +1,17 @@
+//# ~/lab/data/db.js — singleton connection
+import Database from 'better-sqlite3';
+import { join } from 'path';
+import { homedir } from 'os';
+ 
+const DB_PATH = join(homedir(), 'lab', 'data', 'lab.db');
+let _db = null;
+ 
+export function getDb() {
+  if (!_db) {
+    _db = new Database(DB_PATH);
+    _db.pragma('journal_mode = WAL');
+    _db.pragma('foreign_keys = ON');
+  }
+  return _db;
+}
+

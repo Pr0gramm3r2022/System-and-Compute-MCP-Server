@@ -23,7 +23,7 @@ export function registerComputeTools(server) {
       }
     }
   );
-//
+//git 
   server.tool(
     "convert_units",
     "Convert between units",

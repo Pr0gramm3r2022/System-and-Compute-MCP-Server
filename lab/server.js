@@ -1,9 +1,15 @@
+//# Add to server.js imports:
+import { registerDatabaseTools } from './tools/database.js';
+ 
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { registerComputeTools } from './tools/compute.js';
 import { registerFilesystemTools } from './tools/filesystem.js';
 import { registerWebTools } from './tools/web.js';
 import { registerSystemTools } from './tools/system.js';
+
+
 
 // 1. Initialize the MCP Server
 const server = new McpServer({
@@ -22,6 +28,7 @@ registerComputeTools(server);
 registerFilesystemTools(server);
 registerWebTools(server);
 registerSystemTools(server);
+registerDatabaseTools(server);
 
 /**
  * 3. Connect using Standard Input/Output (stdio)
