@@ -1,5 +1,5 @@
 //# Add to server.js imports:
-import { registerDatabaseTools } from './tools/database.js';
+import { registerDatabaseTools } from './data/database.js';
  
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
