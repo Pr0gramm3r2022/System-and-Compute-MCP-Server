@@ -4,6 +4,23 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+
+import readline from 'readline';
+// ... (previous imports and setup)
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+async function chat() {
+  rl.question('You: ', async (input) => {
+    // This is where you would call Anthropic's SDK using your PM_SYSTEM_PROMPT
+    // and the tools listed from the MCP server .
+    console.log("Agent is thinking...");
+    
+    // Placeholder for actual Agent Loop logic (Module 4)
+    // After logic completes:
+    chat(); 
+  });
+}
  
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const logStream = createWriteStream(join(homedir(),'lab','logs','agent.log'), {flags:'a'});
