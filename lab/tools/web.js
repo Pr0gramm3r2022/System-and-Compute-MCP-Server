@@ -7,7 +7,7 @@ export function registerWebTools(server) {
         'Perform an HTTP GET request to a URL. Returns status code, headers, and body (truncated to 4000 chars). Only use for public APIs.',
         {
             url: z.string().url().describe('Full URL including https://'),
-            headers: z.record(z.string(), z.string()).optional().describe('Optional request headers as key-value pairs'),
+            headers: z.record(z.string(), z.string()).optional().describe('Optional request headers as key-value pairs'), //was Optional request headers as key-value pairs'
         },
         async ({ url, headers = {} }) => {
             logger.info('http_get', 'Fetching', { url });
