@@ -60,7 +60,7 @@ rl.on('close', async () => { await mcpClient.close(); process.exit(0); });*/
 
 // lab/agents/task_manager.js
 
-import { fileURLToPath } from 'url';
+/*import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -79,7 +79,7 @@ async function main() {
 
     // 2. Initialize the MCP Client
     const client = new Client({
-        name: "task-manager-agent",
+        name: "task-manager", //name was task-manager-agent
         version: "1.0.0"
     }, {
         capabilities: {
@@ -107,4 +107,39 @@ async function main() {
     }
 }
 
-main();
+main();*/
+
+// lab/agents/task_manager.js
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+
+// 1. Resolve paths OUTSIDE the function so they are global [cite: 608-609]
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SERVER_PATH = resolve(__dirname, '../server.js'); 
+
+async function main() {
+  try {
+    // 2. Initialize transport inside the function [cite: 278]
+    const transport = new StdioClientTransport({
+      command: 'node',
+      args: [SERVER_PATH], // Points to /workspaces/mcpAgentLab/lab/server.js
+    });
+
+    const client = new Client({ name: 'task-manager', version: '1.0.0' });
+
+    // 3. Establish the connection [cite: 278, 561]
+    await client.connect(transport);
+    console.log('✅ Connected to MCP Server.');
+
+    // ... your REPL or agent loop logic goes here ...
+
+  } catch (error) {
+    // Handle Issue 6: Cascade errors [cite: 625-626, 644]
+    console.error('❌ Connection failed. Ensure server.js is in the lab root.');
+    process.exit(1);
+  }
+}
+
+main(); // Don't forget to actually call the function!

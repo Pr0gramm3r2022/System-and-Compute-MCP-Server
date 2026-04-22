@@ -1,7 +1,7 @@
 import { z } from 'zod/v4';
 import { logger } from '../logger.js';
 
-export function registerWebTools(server) {
+/*export function registerWebTools(server) {
     server.tool(
         'http_get',
         'Perform an HTTP GET request to a URL. Returns status code, headers, and body (truncated to 4000 chars). Only use for public APIs.',
@@ -49,4 +49,37 @@ export function registerWebTools(server) {
             }
         }
     );
+}*/
+
+// lab/tools/web.js
+export function registerWebTools(server) {
+  server.tool(
+    'http_get',
+    'Perform an HTTP GET request to a URL.',
+    {
+      url: z.string().url().describe('Full URL including https://'),
+      headers: z.record(z.string()).optional().describe('Optional request headers'),
+    },
+    async ({ url, headers = {} }) => {
+      logger.info('http_get', 'Fetching', { url });
+      try {
+        // MERGE HEADERS: Force User-Agent to 'curl' so wttr.in returns text
+        const response = await fetch(url, { 
+          headers: { 
+            'User-Agent': 'curl/7.64.1', 
+            ...headers 
+          } 
+        });
+
+        const body = await response.text();
+        const result = {
+          status: response.status,
+          body: body.slice(0, 4000) + (body.length > 4000 ? '...[truncated]' : '')
+        };
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true };
+      }
+    }
+  );
 }
