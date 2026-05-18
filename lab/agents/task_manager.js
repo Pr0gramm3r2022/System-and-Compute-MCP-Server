@@ -110,7 +110,7 @@ async function main() {
 main();*/
 
 // lab/agents/task_manager.js
-import { fileURLToPath } from 'url';
+/*import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -142,4 +142,81 @@ async function main() {
   }
 }
 
-main(); // Don't forget to actually call the function!
+main(); // Don't forget to actually call the function!*/
+
+import Anthropic from '@anthropic-ai/sdk';
+import readline from 'readline';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { runAgentLoop, sanitizeInput } from './agent_loop.js';
+import { PM_SYSTEM_PROMPT } from '../prompts/pm_system.js';
+
+// 1. Initialize the MCP Client and point it to the correct Codespace path
+const transport = new StdioClientTransport({
+  command: 'node',
+  args: ['/workspaces/mcpAgentLab/lab/mcp-server/server.js']
+});
+
+const mcpClient = new Client(
+  { name: 'task-manager-client', version: '1.0.0' },
+  { capabilities: {} }
+);
+
+// 2. Setup the CLI Terminal interface
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+// 3. The Interactive Chat Loop
+async function chat() {
+  rl.question('\nYou: ', async (input) => {
+    // Gracefully handle empty submissions
+    if (!input.trim()) return chat(); 
+    
+    // 🛡️ Input Sanitization (OWASP Protection)
+    const safeInput = sanitizeInput(input);
+    console.log("\nAgent is thinking...");
+    
+    try {
+      // 🔄 Fetch available tools dynamically from your calculator server
+      const mcpToolsResponse = await mcpClient.listTools();
+      
+      // 🚀 Fire up the execution engine loop
+      const response = await runAgentLoop({
+        systemPrompt: PM_SYSTEM_PROMPT,
+        userMessage: safeInput,
+        tools: mcpToolsResponse.tools || [], // Expose server tools to Claude
+        toolExecutor: async (name, args) => {
+          // Route Claude's tool requests back down to your server
+          const result = await mcpClient.callTool({ name, arguments: args });
+          return JSON.stringify(result.content);
+        }
+      });
+
+      // 📥 Print out the final answer
+      if (response.success) {
+        console.log(`\nAgent: ${response.result}`);
+      } else {
+        console.log(`\nAgent Error: ${response.result}`);
+      }
+
+    } catch (error) {
+      console.error("\nExecution Exception:", error.message);
+    }
+
+    // Keep the conversation going
+    chat(); 
+  });
+}
+
+// 4. Connect to the Server first, then start the interface
+async function start() {
+  console.log("Connecting to MCP Server...");
+  await mcpClient.connect(transport);
+  console.log("Connected to MCP Server successfully!");
+  
+  // Open the floor to user input
+  chat();
+}
+
+start().catch((error) => {
+  console.error("Failed to start the Agent Lab:", error);
+});

@@ -89,3 +89,13 @@ export async function runAgentLoop({
   agentLog('warn', 'Max iterations reached', { maxIterations });
   return { success:false, result:'Max iterations reached without completion.', iterations, messages };
 }
+
+//# Input sanitizer (add to your agent wrapper)
+export function sanitizeInput(input) {
+  return input
+    .replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f]/g, '')  // control chars
+    .replace(/<[^>]+>/g, '')                              // HTML/XML tags
+    .trim()
+    .slice(0, 2000);                                      // length cap
+}
+
