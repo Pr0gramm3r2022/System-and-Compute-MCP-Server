@@ -1,5 +1,7 @@
-import { z } from 'zod/v4';
+// lab/tools/filesystem.js
+import { z } from 'zod'; //  Fixed
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'fs';
+// ... rest of file remains the same
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { logger } from '../logger.js';
