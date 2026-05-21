@@ -25,9 +25,6 @@ async function chat() {
 const client = new Anthropic({ apiKey: process.env.ANTHROPICKEY });
 const logStream = createWriteStream(join(homedir(),'lab','logs','agent.log'), {flags:'a'});
 
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
- 
 function agentLog(level, msg, data={}) {
   logStream.write(JSON.stringify({ts:new Date().toISOString(),level,msg,...data})+'\n');
 }
@@ -38,7 +35,7 @@ export async function runAgentLoop({
   tools = [],
   toolExecutor,          // async (name, input) => string
   maxIterations = 25,
-  model = process.env.ANTHROPIC_MODEL || 'claude-3-3-sonnet-latest',
+  model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6',
   onToolCall = null,      // optional callback: (name, input, result) => void
 }) {
   const messages = [{ role:'user', content: userMessage }];
