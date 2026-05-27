@@ -1,0 +1,3 @@
+# No Python dependencies detected in this repository.
+# This project is a Node.js / JavaScript application.
+# Install runtime dependencies with `npm install` using package.json.
