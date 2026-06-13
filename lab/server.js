@@ -8,6 +8,7 @@ import { registerComputeTools } from './tools/compute.js';
 import { registerFilesystemTools } from './tools/filesystem.js';
 import { registerWebTools } from './tools/web.js';
 import { registerSystemTools } from './tools/system.js';
+import { sanitizeInput } from '../utils/sanitize.js'
 
 
 
@@ -34,6 +35,28 @@ registerDatabaseTools(server);
  * 3. Connect using Standard Input/Output (stdio)
  * This is the standard transport for local LLM clients like Claude Desktop.
  */
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params
+
+  // Sanitize all string arguments before anything else runs
+  const cleanArgs = Object.fromEntries(
+    Object.entries(args).map(([k, v]) =>
+      [k, typeof v === 'string' ? sanitizeInput(v) : v]
+    )
+  )
+
+  // From here on use cleanArgs instead of args
+  if (name === 'compute') {
+    return handleCompute(cleanArgs)
+  }
+  
+  if (name === 'web_search') {
+    return handleWebSearch(cleanArgs)
+  }
+  
+  // etc
+})
 async function main() {
     try {
         const transport = new StdioServerTransport();
