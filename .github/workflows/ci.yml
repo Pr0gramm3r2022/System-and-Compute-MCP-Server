@@ -1,0 +1,49 @@
+name: CI - Install & Validate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --prefer-offline --no-audit --progress=false
+          else
+            npm install --no-audit --progress=false
+          fi
+
+      - name: Run validations
+        run: |
+          echo "Running npm audit (non-fatal)"
+          npm audit --audit-level=moderate || true
+
+          echo "Checking for lint script"
+          if npm run | grep -q "lint"; then
+            echo "Running lint..."
+            npm run lint
+          else
+            echo "No lint script defined"
+          fi
+
+          echo "Checking for test script"
+          if npm run | grep -q "test"; then
+            echo "Running tests..."
+            npm test
+          else
+            echo "No test script defined"
+          fi
