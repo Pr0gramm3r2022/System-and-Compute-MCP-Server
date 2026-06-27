@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-
+//removed import for sanitize.js
 import readline from 'readline';
 // ... (previous imports and setup)
 

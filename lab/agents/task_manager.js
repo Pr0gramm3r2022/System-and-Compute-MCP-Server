@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { runAgentLoop } from './mcp_agent.js'; 
 import { PM_SYSTEM_PROMPT } from '../prompts/pm_system.js';
+import { sanitizeInput } from '../../utils/sanitize.js';
 
 // ── Connect cleanly using inherited environment streams ──────────
 const transport = new StdioClientTransport({
