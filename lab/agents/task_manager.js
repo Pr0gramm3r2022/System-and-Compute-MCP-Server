@@ -1,35 +1,4 @@
-// lab/agents/task_manager.js
-/*import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-import readline from 'readline';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { runAgentLoop } from './mcp_agent.js'; // 💡 Fixed to point to your actual file!
-import { PM_SYSTEM_PROMPT } from '../prompts/pm_system.js';
 
-// ── Resolve server path dynamically (Points to the mcp-server subfolder) ──
-const __dirname   = dirname(fileURLToPath(import.meta.url));
-const SERVER_PATH = resolve(__dirname, '/workspaces/mcpAgentLab/lab/server.js'); // 💡 Fixed server path
-
-// ── Connect to MCP Server ──────────────────────────────────────
-const transport = new StdioClientTransport({
-  command: 'node',
-  args: [SERVER_PATH],
-  //stderr: 'inherit'
-  spawnOptions: {
-    stdio: ['ignore', 'pipe', 'inherit']
-  }
-});
-
-const mcpClient = new Client(
-  { name: 'task-manager', version: '1.0.0' },
-  { capabilities: {} }
-);
-
-await mcpClient.connect(transport);
-console.log('✅ Connected to MCP Server.'); */
-
-// lab/agents/task_manager.js
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import readline from 'readline';

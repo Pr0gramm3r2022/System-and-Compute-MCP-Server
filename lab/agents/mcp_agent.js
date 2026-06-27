@@ -43,13 +43,13 @@ export async function runAgentLoop({
   agentLog('info', 'Agent started', { model, userMessage: userMessage.slice(0,100) });
 
   //# Input sanitizer (add to the agent wrapper)
-export function sanitizeInput(input) {
+/*export function sanitizeInput(input) {
   return input
     .replace(/[\x00-\x08\x0b-\x0c\x0e-\x1f]/g, '')  // control chars
     .replace(/<[^>]+>/g, '')                              // HTML/XML tags
     .trim()
     .slice(0, 2000);                                      // length cap
-}
+}*/
  
   while (iterations < maxIterations) {
     iterations++;
