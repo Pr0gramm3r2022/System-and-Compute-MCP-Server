@@ -8,7 +8,7 @@ import { registerComputeTools } from './tools/compute.js';
 import { registerFilesystemTools } from './tools/filesystem.js';
 import { registerWebTools } from './tools/web.js';
 import { registerSystemTools } from './tools/system.js';
-import { sanitizeInput } from '../utils/sanitize.js'
+//import { sanitizeInput } from '../utils/mcp_agent.js'
 
 
 
@@ -36,7 +36,7 @@ registerDatabaseTools(server);
  * This is the standard transport for local LLM clients like Claude Desktop.
  */
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+/*server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params
 
   // Sanitize all string arguments before anything else runs
@@ -56,7 +56,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   
   // etc
-})
+})*/ //agents said that a reference error was causing this.
+
 async function main() {
     try {
         const transport = new StdioServerTransport();

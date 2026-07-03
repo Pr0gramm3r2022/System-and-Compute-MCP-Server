@@ -55,4 +55,61 @@ export function registerComputeTools(server) {
     }
   );
 
+  // ── Tool 3: Divide Two Numbers ─────────────────────────────────────
+  server.tool(
+    "divide",
+    "Divides one number by another (a / b).",
+    {
+      a: z.number().describe("The dividend (numerator)"),
+      b: z.number().describe("The divisor (denominator)")
+    },
+    async ({ a, b }) => {
+      try {
+        if (b === 0) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: "Calculation error: division by zero" }]
+          };
+        }
+        const quotient = a / b;
+        return {
+          content: [{ type: "text", text: `Result: ${quotient}` }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Calculation error: ${error.message}` }]
+        };
+      }
+    }
+  );
+
+  // ── Tool 4: Square Root ────────────────────────────────────────────
+  server.tool(
+    "sqrt",
+    "Computes the square root of a number (√a).",
+    {
+      a: z.number().describe("The value to take the square root of (must be >= 0)")
+    },
+    async ({ a }) => {
+      try {
+        if (a < 0) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: "Calculation error: cannot take square root of a negative number" }]
+          };
+        }
+        const root = Math.sqrt(a);
+        return {
+          content: [{ type: "text", text: `Result: ${root}` }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Calculation error: ${error.message}` }]
+        };
+      }
+    }
+  );
+
 }
