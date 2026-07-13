@@ -1,6 +1,7 @@
 {
   "name": "mcpagentlab",
   "version": "1.0.0",
+  "type": "module",
   "description": "building an MCP server from docs, integrating it with claude code, and deploying it. building with MCP SDK and Anthropic SDK",
   "main": "index.js",
   "scripts": {

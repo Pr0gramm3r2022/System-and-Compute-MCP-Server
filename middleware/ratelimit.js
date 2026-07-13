@@ -7,7 +7,7 @@ export const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many requests. Retry after 15 minutes.' },
+  //message: { error: 'Too many requests. Retry after 15 minutes.' }, claude recommendations: no customm key generator - default handles IPv4/IPv6 correctly
 });
  
 // Strict limit for destructive tools: 10 deletes per hour
