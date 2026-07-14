@@ -10,8 +10,19 @@ import { registerDatabaseTools }   from '../lab/tools/database.js';
 import { registerWebTools }        from '../lab/tools/web.js';
 import { registerSystemTools }     from '../lab/tools/system.js';
 //rewrote file paths using grep
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+ 
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  keyGenerator: (req) => req.headers['x-api-key'] || ipKeyGenerator(req.ip)
+  //need an api key 
+}); 
  
 const app = express();
+// Behind a proxy (dev container / Codespaces forwarder), so trust the
+// X-Forwarded-For header for accurate client IPs in rate limiting.
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json());
 app.use(globalLimiter);
