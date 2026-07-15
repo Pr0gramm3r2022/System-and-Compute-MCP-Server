@@ -27,6 +27,13 @@ app.use(cors());
 app.use(express.json());
 app.use(globalLimiter);
   
+// Root helper route
+app.get('/', (_, res) => res.json({
+  status: 'ok',
+  message: 'HTTP MCP Server is running',
+  routes: ['/health', '/sse (requires x-api-key)', '/messages (POST, requires x-api-key)']
+}));
+
 // Health check (no auth required)
 app.get('/health', (_, res) => res.json({ status:'ok', ts:new Date().toISOString() }));
  // Session store: one McpServer instance per active SSE connection

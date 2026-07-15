@@ -1,3 +1,3 @@
-# No Python dependencies detected in this repository.
-# This project is a Node.js / JavaScript application.
+# This repository does not currently use Python dependencies.
+# It is a Node.js / JavaScript project.
 # Install runtime dependencies with `npm install` using package.json.
