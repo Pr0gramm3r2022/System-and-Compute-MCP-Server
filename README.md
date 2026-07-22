@@ -1,4 +1,7 @@
 # MCP Agent Lab
+# System and Compute MCP Server Ecosystem
+building an MCP server from docs, integrating it with claude code, and deploying it. building with Node.js, MCP SDK, and Anthropic API.
+Calculator tool that enables agents to do different types of calculations requiring square roots.
 
 This project is a hands-on lab for building and experimenting with a Model Context Protocol (MCP) server in Node.js. It demonstrates how an AI agent can connect to a server that exposes tools for computation, file access, web requests, system inspection, and lightweight database operations.
 
