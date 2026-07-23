@@ -1,0 +1,39 @@
+/*import { sanitizeInput } from '../utils/sanitize.js'
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params
+  
+  const cleanArgs = Object.fromEntries(
+    Object.entries(args).map(([k, v]) => 
+      [k, typeof v === 'string' ? sanitizeInput(v) : v]
+    )
+  )
+  
+  // proceed with cleanArgs
+})*/
+
+import { sanitizeInput } from '../utils/sanitize.js'
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params
+
+  // Guard against null/undefined args
+  const cleanArgs = args ? Object.fromEntries(
+    Object.entries(args).map(([k, v]) =>
+      [k, typeof v === 'string' ? sanitizeInput(v) : v]
+    )
+  ) : {}
+
+  // Route to your existing tool handlers using cleanArgs
+  switch (name) {
+    case 'compute':
+      return handleCompute(cleanArgs)
+    case 'web_search':
+      return handleWebSearch(cleanArgs)
+    case 'read_file':
+      return handleReadFile(cleanArgs)
+    // add your other tool names here
+    default:
+      throw new Error(`Unknown tool: ${name}`)
+  }
+})

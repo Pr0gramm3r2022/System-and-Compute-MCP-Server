@@ -1,5 +1,7 @@
-import { z } from 'zod/v4';
-import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'fs';
+// lab/tools/filesystem.js
+import { z } from 'zod'; //  Fixed
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+// ... rest of file remains the same
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { logger } from '../logger.js';
@@ -69,6 +71,29 @@ export function registerFilesystemTools(server) {
 
                 writeFileSync(full, content, 'utf8');
                 return { content: [{ type: 'text', text: `Written ${content.length} bytes to ${path}` }] };
+            } catch (e) {
+                return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true };
+            }
+        }
+    );
+
+    // --- DELETE FILE ---
+    server.tool(
+        'delete_file',
+        'Delete a file in the lab directory. Path is relative to ~/lab/. Refuses to delete directories.',
+        { path: z.string().describe('Relative path within ~/lab/ of the file to delete') },
+        async ({ path }) => {
+            logger.info('delete_file', 'Deleting', { path });
+            try {
+                const full = safePath(path);
+                if (!existsSync(full)) {
+                    return { content: [{ type: 'text', text: `File not found: ${path}` }], isError: true };
+                }
+                if (statSync(full).isDirectory()) {
+                    return { content: [{ type: 'text', text: `Refusing to delete directory: ${path}` }], isError: true };
+                }
+                unlinkSync(full);
+                return { content: [{ type: 'text', text: `Deleted ${path}` }] };
             } catch (e) {
                 return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true };
             }

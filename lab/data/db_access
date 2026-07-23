@@ -15,3 +15,26 @@ export function getDb() {
   return _db;
 }
 
+//# ~/lab/data/seed.js
+import { getDb } from './db.js';
+const db = getDb();
+ 
+const tasks = [
+  { title:'Set up MCP Server',       status:'done',        priority:1 },
+  { title:'Implement agent loop',     status:'done',        priority:1 },
+  { title:'Add database tools',       status:'in_progress', priority:2 },
+  { title:'Write integration tests',  status:'pending',     priority:2 },
+  { title:'Deploy to cloud',          status:'pending',     priority:3 },
+  { title:'Add authentication',       status:'pending',     priority:2 },
+  { title:'Set up CI/CD pipeline',    status:'pending',     priority:3 },
+  { title:'Performance benchmarking', status:'pending',     priority:4 },
+];
+ 
+const stmt = db.prepare('INSERT OR IGNORE INTO tasks(title,status,priority) VALUES(?,?,?)');
+tasks.forEach(t => stmt.run(t.title, t.status, t.priority));
+console.log(`Seeded ${tasks.length} tasks.`);
+db.close();
+ 
+//# Run it:
+//node ~/lab/data/seed.js
+

@@ -1,0 +1,99 @@
+Project File Descriptions and How They Work
+
+1. README.md
+   - Explains the project purpose: building an MCP server using Node.js, the MCP SDK, and Anthropic.
+   - Describes the available tools, including calculator tools and file/system operations exposed to agents.
+
+2. package.json
+   - Defines project metadata, dependencies, and scripts.
+   - Uses ECMAScript modules via "type": "module".
+   - Lists dependencies used by the MCP server, Express, rate limiting, JWT, SQLite, and Anthropic.
+
+3. httpmcpserver/http_server.js
+   - Implements an Express HTTP server for the MCP application.
+   - Sets up CORS, JSON request parsing, and global rate limiting.
+   - Adds a root route at "/" returning server status and available endpoints.
+   - Includes a health check route at "/health".
+   - Exposes an SSE endpoint at "/sse" that initializes a new MCP server instance using @modelcontextprotocol/sdk.
+   - Registers tool modules for compute, filesystem, database, web, and system operations.
+   - Stores active SSE sessions in a Map and links them to a "/messages" POST endpoint for JSON-RPC messages.
+
+4. middleware/auth.js
+   - Provides API key authorization middleware for protected routes.
+   - Reads valid API keys from the MCP_API_KEYS environment variable.
+   - Verifies requests that include a Bearer token in the Authorization header.
+   - Uses timing-safe comparison to avoid timing attacks and logs auth events to stderr.
+
+5. middleware/ratelimit.js
+   - Defines global and destructive rate limiting using express-rate-limit.
+   - globalLimiter limits requests to 100 per 15 minutes per IP.
+   - destructiveLimiter limits destructive operations like deletes to 10 per hour.
+
+6. lab/server.js
+   - Example or alternate MCP server entrypoint using stdio transport.
+   - Creates an McpServer instance and registers compute, filesystem, web, system, and database tools.
+   - Connects the server to a StdioServerTransport for local client integration.
+   - Logs startup status to stderr since stdout is reserved for JSON-RPC traffic.
+
+7. lab/tools/compute.js
+   - Registers computation tools on the MCP server.
+   - Includes add, multiply, divide, and sqrt tools.
+   - Uses zod schemas to validate numeric arguments and return result text.
+   - Handles errors like division by zero and invalid square root inputs.
+
+8. lab/tools/filesystem.js
+   - Registers filesystem tools that operate within a restricted lab directory.
+   - Provides read_file, write_file, delete_file, and list_directory tools.
+   - Uses safePath to prevent directory traversal attacks by resolving paths under ~/lab.
+   - Writes logs using the lab logger and validates file operations.
+
+9. lab/tools/database.js
+   - Registers database tools backed by better-sqlite3.
+   - Exposes list_tasks, create_task, and update_task_status tools for task management.
+   - Uses zod to validate inputs and database queries to manage tasks.
+   - Initializes the database connection through lab/data/db.js.
+
+10. lab/tools/web.js
+   - Registers a web request tool for HTTP GET operations.
+   - Validates URL and optional headers with zod.
+   - Uses fetch to perform request and returns truncated response text for safety.
+
+11. lab/tools/system.js
+   - Registers a system_info tool for runtime diagnostics.
+   - Returns platform, architecture, Node version, uptime, memory, process ID, CPU cores, and disk availability.
+   - Uses shell commands as a fallback to gather CPU and disk metrics.
+
+12. lab/logger.js
+   - Implements a simple logging utility for the lab.
+   - Creates a persistent log file in ~/lab/logs/server.log.
+   - Exposes info, warn, and error logging methods.
+   - Writes structured JSON log entries to both disk and stderr.
+
+13. lab/data/db.js
+   - Manages the SQLite database connection for the lab.
+   - Ensures data directories exist and opens better-sqlite3 at ~/lab/data/lab.db.
+   - Sets pragmas for WAL journaling and foreign keys.
+   - Auto-bootstraps tables for tasks and notes if they do not exist.
+
+14. lab/data/bootstrap.js
+   - Provides a health-check script for the lab environment.
+   - Verifies required files exist and that environment variables are present.
+   - Confirms SQLite connectivity and prints success or failure status.
+
+15. utils/sanitize.js
+   - Exports sanitizeInput to clean string data before processing.
+   - Removes control characters, strips HTML tags, and filters dangerous instruction-like phrases.
+   - Trims and truncates long input strings to a safe length.
+
+16. tools1/*
+   - Contains duplicate utility modules: compute.js, filesystem.js, logger.js, system.js, web.js.
+   - These files appear to mirror the same functionality found in lab/tools and may be alternate copies or earlier versions.
+
+17. http_mcp_server/
+   - Currently an empty directory. It may be reserved for a separate MCP HTTP server variant or future files.
+
+Additional notes:
+- The project is structured around an MCP server with tool registration and transport layers.
+- The active HTTP implementation in httpmcpserver/http_server.js is the main interface for clients connecting via SSE and JSON-RPC.
+- The lab directory contains the core MCP tool definitions, database setup, and logging infrastructure.
+- The middleware directory provides security and rate-limiting support for the HTTP server.
