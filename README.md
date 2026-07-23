@@ -6,8 +6,6 @@ Calculator tool that enables agents to do different types of calculations requir
 # MCP Agent Lab
 >>>>>>> ci/cd
 
-This project is a hands-on lab for building and experimenting with a Model Context Protocol (MCP) server in Node.js. It demonstrates how an AI agent can connect to a server that exposes tools for computation, file access, web requests, system inspection, and lightweight database operations.
-
 ## What the project does
 
 The repository contains an MCP server implementation that can be used by agent-based applications and local LLM clients. It provides a small set of tools that allow agents to:
