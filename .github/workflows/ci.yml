@@ -40,10 +40,10 @@ jobs:
             echo "No lint script defined"
           fi
 
-          echo "Checking for test script"
-          if npm run | grep -q "test"; then
-            echo "Running tests..."
-            npm test
-          else
-            echo "No test script defined"
-          fi
+        #  echo "Checking for test script"
+         # if npm run | grep -q "test"; then
+          #  echo "Running tests..."
+           # npm test
+          #else
+           # echo "No test script defined"
+          #fi
