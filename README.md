@@ -1,19 +1,13 @@
 
 # System and Compute MCP Server Ecosystem
-building an MCP server from docs, integrating it with claude code, and deploying it. building with Node.js, MCP SDK, and Anthropic API.
-Calculator tool that enables agents to do different types of calculations requiring square roots.
-=======
-# MCP Agent Lab
-# System and Compute MCP Server Ecosystem
-building an MCP server from docs, integrating it with claude code, and deploying it. building with Node.js, MCP SDK, and Anthropic API.
-Calculator tool that enables agents to do different types of calculations requiring square roots.
+building an MCP server from docs, integrating it with claude code, and deploying it. building with Node.js, MCP SDK, and Anthropic SDK and API.
 
 
 ## What the project does
 
 The repository contains an MCP server implementation that can be used by agent-based applications and local LLM clients. It provides a small set of tools that allow agents to:
 
-- perform varios calculations requiring basic math operations and square roots
+- perform various calculations requiring basic math operations and square roots
 - read and write files within a controlled workspace
 - inspect system information such as platform, memory, and runtime details
 - make HTTP GET requests to public APIs or other web endpoints
