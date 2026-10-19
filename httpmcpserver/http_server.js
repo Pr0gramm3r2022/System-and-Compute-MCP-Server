@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { requireApiKey } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
+import { protectedResourceMetadata } from '../middleware/oauth.js';
 import { globalLimiter } from '../middleware/ratelimit.js';
 import { registerComputeTools }    from '../lab/tools/compute.js';
 import { registerFilesystemTools } from '../lab/tools/filesystem.js';
@@ -31,16 +32,19 @@ app.use(globalLimiter);
 app.get('/', (_, res) => res.json({
   status: 'ok',
   message: 'HTTP MCP Server is running',
-  routes: ['/health', '/sse (requires x-api-key)', '/messages (POST, requires x-api-key)']
+  routes: ['/health', '/sse (requires Authorization: Bearer)', '/messages (POST, requires Authorization: Bearer)']
 }));
 
 // Health check (no auth required)
 app.get('/health', (_, res) => res.json({ status:'ok', ts:new Date().toISOString() }));
+
+// OAuth discovery for MCP clients (no auth required)
+app.get('/.well-known/oauth-protected-resource', protectedResourceMetadata);
  // Session store: one McpServer instance per active SSE connection
 const sessions = new Map();
  
 // SSE endpoint: client connects here first
-app.get('/sse', requireApiKey, (req, res) => {
+app.get('/sse', requireAuth, (req, res) => {
   const server = new McpServer({ name:'mcp-lab-server', version:'1.0.0' });
   registerComputeTools(server);
   registerFilesystemTools(server);
@@ -60,7 +64,7 @@ app.get('/sse', requireApiKey, (req, res) => {
 });
  
 // Message endpoint: client posts JSON-RPC here
-app.post('/messages', requireApiKey, (req, res) => {
+app.post('/messages', requireAuth, (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = sessions.get(sessionId);
   if (!transport) return res.status(404).json({ error:'Session not found' });
