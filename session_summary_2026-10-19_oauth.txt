@@ -1,0 +1,91 @@
+SESSION SUMMARY - 2026-10-19 (OAuth setup)
+==========================================
+
+QUESTIONS ANSWERED
+------------------
+1. Does auth.js need a real JWKS_URI?
+   No. auth.js only checks API keys from MCP_API_KEYS. JWKS_URI lives in
+   middleware/oauth.js, which was not imported anywhere, so its placeholder
+   URL never ran.
+2. Is oauth.js the only security on the server?
+   No. Before this session it was unused. The real protection was:
+     - middleware/auth.js: API key check on /sse and /messages
+     - middleware/ratelimit.js: 100 requests / 15 min per IP
+     - lab/tools/filesystem.js: file tools restricted to ~/lab
+     - utils/sanitize.js: input sanitizing
+3. Does OAuth add real security?
+   Little for a single-user lab server. It helps with multiple users or
+   claude.ai connectors: short-lived tokens, per-user identity, revocation
+   at the identity provider, MFA/SSO, scopes, no shared secret to hand out.
+   OAuth 2.1 is the MCP spec's standard auth for remote servers.
+
+CODE CHANGES (commit 8ee5bf9, pushed to origin/main)
+----------------------------------------------------
+middleware/oauth.js
+  - Removed placeholder IdP URLs. OAuth turns on only when OAUTH_JWKS_URI,
+    OAUTH_ISSUER and OAUTH_AUDIENCE are all set (exported as oauthEnabled).
+  - jwt.verify now pins algorithms: ['RS256'].
+  - JWKS client rate-limits key fetches.
+  - Added protectedResourceMetadata() for
+    /.well-known/oauth-protected-resource (RFC 9728), so MCP clients can
+    discover the authorization server.
+  - Added wwwAuthenticate() to build the WWW-Authenticate header for 401s.
+  - Added resourceUrl(), which uses MCP_RESOURCE_URL if set.
+
+middleware/auth.js
+  - requireApiKey replaced by requireAuth. It accepts either an API key from
+    MCP_API_KEYS or (when OAuth is configured) a JWT from the IdP, both as
+    "Authorization: Bearer <token>".
+  - Invalid or expired tokens return a generic 401 with
+    WWW-Authenticate: ... error="invalid_token". The real reason is only
+    written to the audit log.
+  - Audit log entries now include the auth method and the user's sub.
+
+httpmcpserver/http_server.js
+  - /sse and /messages use requireAuth.
+  - Added public GET /.well-known/oauth-protected-resource.
+  - Root route text now says "Authorization: Bearer" instead of "x-api-key".
+
+TESTING
+-------
+Syntax check (node --check) passed on all three files.
+Ran a local test against a stand-in identity provider using a generated
+RSA key:
+  no header        -> 401 + WWW-Authenticate with resource_metadata
+  valid API key    -> 200
+  wrong API key    -> 401
+  valid JWT        -> 200 (sub in audit log)
+  wrong audience   -> 401
+  expired JWT      -> 401
+  metadata route   -> correct JSON
+Not yet tested against a real IdP or on Cloud Run.
+Ran npm install in the repo root for the test. node_modules is gitignored.
+
+GIT ISSUES HIT
+--------------
+- "git add." failed (no space before the dot), so the first commit and
+  push did nothing.
+- Fixed with "git add .", then commit 8ee5bf9 and push succeeded.
+- The commit message has a typo ("auth,js"); left as is since it's pushed.
+
+NEXT STEPS (NOT STARTED)
+------------------------
+1. Redeploy to Cloud Run (the live server still runs the old code unless
+   it auto-deploys from GitHub).
+2. Set up an identity provider (Auth0 suggested) and create an API whose
+   identifier is https://mcp-server-996049909214.us-central1.run.app
+3. Set on Cloud Run:
+     OAUTH_ISSUER=https://<tenant>.us.auth0.com/   (trailing slash matters)
+     OAUTH_JWKS_URI=https://<tenant>.us.auth0.com/.well-known/jwks.json
+     OAUTH_AUDIENCE=https://mcp-server-996049909214.us-central1.run.app
+     MCP_RESOURCE_URL=https://mcp-server-996049909214.us-central1.run.app
+4. Check /.well-known/oauth-protected-resource returns JSON (404 means
+   the env vars aren't set).
+5. Once OAuth works, consider removing MCP_API_KEYS so no long-lived
+   secret remains.
+6. Other gaps noted, not fixed:
+   - cors() allows any origin.
+   - filesystem.js startsWith(LAB_ROOT) check also accepts sibling paths
+     like ~/lab-other; compare against LAB_ROOT + path.sep instead.
+   - destructiveLimiter and the unused limiter in http_server.js key on
+     an x-api-key header that clients never send.
