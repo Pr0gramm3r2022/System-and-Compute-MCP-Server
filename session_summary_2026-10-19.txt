@@ -1,0 +1,46 @@
+SESSION SUMMARY - 2026-10-19
+============================
+
+ACTIONS TAKEN
+-------------
+1. Login: you ran /login, and it succeeded.
+2. Found the deployment URL: the README lists the live Cloud Run URL
+   https://mcp-server-996049909214.us-central1.run.app
+3. Checked MCP connections: the system-compute-server tools available in
+   Claude Code run from the local copy (node lab/server.js over stdio), not
+   from the deployed server.
+4. Probed the deployed server:
+     /        -> 200 (server is running)
+     /health  -> 200
+     /sse     -> 401 (no API key sent)
+     /mcp     -> 404
+5. Looked for a key: no MCP_API_KEY or API_KEY is set in the environment.
+   lab/agents/http_client.js falls back to the placeholder 'your-api-key'.
+6. Read the auth code: middleware/auth.js checks for
+   "Authorization: Bearer <key>" against the keys in MCP_API_KEYS.
+
+ISSUES ENCOUNTERED
+------------------
+1. No access to the deployed tools: without a valid API key only the public
+   routes could be reached. /sse could not be opened, and no tools on the
+   deployed server could be called.
+2. Auth header mismatch:
+   - The root route and httpmcpserver/http_server.js:34 say
+     "requires x-api-key".
+   - The rate limiter (httpmcpserver/http_server.js:18) also uses the
+     x-api-key header.
+   - But middleware/auth.js actually requires "Authorization: Bearer".
+   - So a client following the route description sends the wrong header and
+     gets a 401, and the rate limiter falls back to limiting by IP.
+3. Placeholder key: http_client.js quietly uses 'your-api-key' when no key is
+   set. Requests then fail with an auth error instead of a clear
+   "key not set" message.
+
+NEXT STEPS (NOT STARTED)
+------------------------
+- Set the key with: export MCP_API_KEY=<key>
+  then test the deployed tools.
+- Make the docs, rate limiter and auth middleware use the same header.
+- Have http_client.js stop with a clear error when no key is set.
+
+No code files were changed in this session.
