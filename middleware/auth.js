@@ -4,6 +4,7 @@ import { oauthEnabled, validateJwt, wwwAuthenticate } from './oauth.js';
 
 // Multiple API keys support (e.g., per-team keys)
 const VALID_KEYS = new Set(
+  //was previously .MCP_API_KEY
   (process.env.MCP_API_KEYS || '').split(',').map(k => k.trim()).filter(Boolean)
 );
 
