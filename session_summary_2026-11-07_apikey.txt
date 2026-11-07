@@ -1,0 +1,97 @@
+SESSION SUMMARY - 2026-11-07 (MCP API KEY ISSUE)
+================================================
+
+Status: proposals only. No API-key code has been changed yet.
+(Earlier this session: fixed the date("now") bug in lab/tools/database.js
+update_task_status. See "OTHER WORK THIS SESSION" at the bottom.)
+
+
+1. API KEYS ARE PUBLIC ON GITHUB (URGENT)
+-----------------------------------------
+- apikeys.env (2 keys) was committed in 6635f15 and a5fad7a before
+  dffc197 stopped tracking it.
+- Those commits are on origin/main, and the GitHub repo is public, so
+  anyone can read both keys from the history.
+- The file holds bare values, not NAME=value lines.
+
+Fix:
+- Treat both keys as compromised. Generate new ones
+  (openssl rand -hex 32) and set them wherever the deployed server reads them.
+- Optional: remove the file from history with git filter-repo and a
+  force-push. This doesn't help on its own, because the keys could
+  already have been copied.
+
+
+2. THE SERVER NEVER LOADS THE KEYS
+----------------------------------
+- httpmcpserver/http_server.js never loads dotenv or any env file, so
+  MCP_API_KEYS is empty and every key gets a 403.
+- apikeys.env holds bare values, not MCP_API_KEYS=key1,key2, so it couldn't
+  be loaded even if the server tried.
+- middleware/auth.js reads the keys when it is first imported. Any loading
+  has to happen before that import.
+
+Options:
+- A. Node's built-in loader (RECOMMENDED):
+     package.json -> "start:http": "node --env-file=.env httpmcpserver/http_server.js"
+     .env (already gitignored) -> MCP_API_KEYS=<new1>,<new2>
+     This needs no new code and avoids the import-order problem.
+- B. dotenv: put "import 'dotenv/config'" as the first line of
+     http_server.js. It's already a dependency, but it breaks quietly if
+     someone reorders the imports.
+- Cloud Run, either way: store the keys in Secret Manager and expose them
+  as MCP_API_KEYS, rather than as a plain environment variable or a file.
+
+
+3. THE CLIENT AND SERVER USE DIFFERENT NAMES
+--------------------------------------------
+  Where                                What it uses
+  Server (middleware/auth.js)          MCP_API_KEYS (plural), sent as
+                                       Authorization: Bearer
+  Client (lab/agents/http_client.js:6) MCP_API_KEY (singular), falling back
+                                       to 'your-api-key'
+  Rate limiters (middleware/           an x-api-key header that no client
+  ratelimit.js:17, http_server.js:19)  sends
+
+Fix:
+- Make the client exit with a clear "MCP_API_KEY not set" message instead
+  of falling back to the placeholder.
+- Make both limiters key on the Bearer token. Hashing it first means the
+  raw key never sits in limiter memory.
+- Delete the unused `limiter` in http_server.js.
+
+
+4. MAKE FAILURES OBVIOUS
+------------------------
+- Startup warning: if MCP_API_KEYS is empty and OAuth is off, have the
+  server log a warning at startup, or refuse to start. Without that, the
+  only symptom of a missing key is a 403 on every request.
+- Tests: turn CI's npm test step back on (it's commented out in
+  .github/workflows/ci.yml), and remove the unrelated ANTHROPICKEY lines
+  from tests/auth.apikey.test.js and tests/auth.oauth.test.js.
+
+
+RECOMMENDED ORDER
+-----------------
+1. Replace the leaked keys, and decide whether to clean the history.
+   (Needs the user: the deployed Cloud Run server has to be updated.)
+2. Option A plus the startup warning.
+3. Client and rate-limiter fixes.
+4. Turn tests back on in CI.
+
+
+OTHER WORK THIS SESSION
+-----------------------
+- Checked the SQLite database (~/lab/data/lab.db, NOT the repo's
+  lab/data/). The integrity check passed, WAL mode is on, and the tasks and
+  notes tables exist, both empty.
+- Fixed lab/tools/database.js:50: date("now") -> date('now'). SQLite read
+  "now" in double quotes as a column name, so every update_task_status
+  call failed. Tested end-to-end over MCP against a throwaway database:
+  create, update and list all work.
+- The fix is not committed. The running MCP server must be restarted
+  (/mcp) before it picks up the fix.
+- Not fixed yet:
+  - update_task_status reports success even when no task has that ID.
+  - The repo tracks stray lab/data/lab.db-shm and lab.db-wal files.
+  - pm_system.js mentions delete-task and notes tools that don't exist.
