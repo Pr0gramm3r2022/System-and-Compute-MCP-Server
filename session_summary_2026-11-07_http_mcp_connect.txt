@@ -1,0 +1,80 @@
+SESSION LOG - 2026-11-07 (CONNECTING THE HTTP MCP SERVER TO CLAUDE CODE)
+========================================================================
+
+Session ran from about 18:21 to 21:55 UTC on 2026-11-07.
+Continues session_summary_2026-11-07_apikey_fixes.txt.
+No key values are written in this file.
+
+
+1. CHECKED THE MCP SETUP
+------------------------
+- Ran `claude mcp --help` and `claude mcp list`. (`\mcp` with a backslash
+  is not a command. The slash command is `/mcp`, and the user has to type it.)
+- All 5 servers were connected: Claude Docs, Google Drive, Gmail,
+  Google Calendar, and system-compute-server (stdio, lab/server.js).
+- Claude Code version: 2.1.319.
+
+
+2. CHECKED THE HTTP SERVER
+--------------------------
+- httpmcpserver/http_server.js was running as PID 16217 (started 18:50
+  from the user's terminal) and listening on port 3000. GET / returned 200.
+- It was not registered with Claude Code. Only the stdio lab/server.js was.
+
+
+3. REGISTERED THE HTTP SERVER WITH CLAUDE CODE
+----------------------------------------------
+- The user ran:
+    claude mcp add --transport sse mcp-lab-local http://localhost:3000/sse \
+      --header "Authorization: Bearer test-key-123"
+- This is saved in ~/.claude.json (local scope, this project). The key is
+  stored there in plain text.
+- GET /sse with that key returned 200 and the stream stayed open.
+
+
+4. FIXED "HTTP 400: stream is not readable" (DONE, COMMITTED IN 786894d)
+------------------------------------------------------------------------
+- `claude mcp get mcp-lab-local` failed with HTTP 400 on /messages.
+- Cause: app.use(express.json()) reads the request body before the
+  /messages handler runs, so the MCP SSE transport can't read it again.
+- Fix in httpmcpserver/http_server.js (the /messages route):
+    transport.handlePostMessage(req, res, req.body);
+- The user stopped PID 16217 to restart with the fix.
+
+
+5. RESTARTED THE SERVER AND HIT A 403 (OPEN)
+--------------------------------------------
+- The user's restart command had a typo (`node httpmcpserver/ http_server.js`),
+  so Node failed with MODULE_NOT_FOUND.
+- Claude started the server in the background. /health returned ok, but
+  mcp-lab-local got HTTP 403.
+- Cause: middleware/auth.js reads MCP_API_KEYS from the environment, and
+  http_server.js doesn't load any env file (same issue as Fix 2 in
+  session_summary_2026-11-07_apikey_fixes.txt).
+- Restarted with `node --env-file=.env httpmcpserver/http_server.js`.
+  Still 403, because test-key-123 is not one of the keys in .env. The
+  user's original terminal must have had MCP_API_KEYS set by hand with
+  test-key-123 in it.
+- The background server was stopped when the session ended. Nothing is
+  running on port 3000 now, so mcp-lab-local shows ECONNREFUSED.
+- Whether the 400 fix works end to end has NOT been confirmed yet.
+
+
+STILL TO DO
+-----------
+Pick one:
+  a) Add test-key-123 to MCP_API_KEYS in .env (gitignored). Easiest for a lab.
+  b) Re-register mcp-lab-local with a key that's already in .env:
+       claude mcp remove mcp-lab-local -s local
+       claude mcp add --transport sse mcp-lab-local http://localhost:3000/sse \
+         --header "Authorization: Bearer <key from .env>"
+     (The real key then sits in plain text in ~/.claude.json.)
+Then:
+  - Start the server from a terminal: node --env-file=.env httpmcpserver/http_server.js
+  - Run `claude mcp get mcp-lab-local` and check it shows Connected.
+  - Reconnect it in /mcp (or start a new session) and try one tool call.
+Other notes:
+  - mcp-lab-local likely exposes the same tool names as system-compute-server
+    (add, read_file, ...), so both sets will appear with different prefixes.
+  - globalLimiter also applies to /messages, so a busy session could hit
+    the rate limit. The `limiter` in http_server.js is still unused.
