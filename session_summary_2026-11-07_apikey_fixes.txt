@@ -1,0 +1,82 @@
+SESSION LOG - 2026-11-07 (API KEY FIXES)
+========================================
+
+Continues session_summary_2026-11-07_apikey.txt.
+No key values are written in this file. They are only in .env and
+apikeys.env, which are both gitignored.
+
+
+FIX 1: REPLACE THE LEAKED KEYS (PARTLY DONE)
+--------------------------------------------
+Done:
+- Generated 2 new keys (openssl rand -hex 32).
+- Created .env (gitignored, chmod 600):
+    MCP_API_KEYS=<new1>,<new2>   <- read by the server (middleware/auth.js)
+    MCP_API_KEY=<new1>           <- read by the client (lab/agents/http_client.js)
+- Overwrote apikeys.env with the 2 new keys (gitignored, chmod 600).
+- Checked: the old keys are not in either file. Both new keys load
+  correctly with `node --env-file=.env`.
+
+Still to do (needs the user, because gcloud isn't installed in the container):
+- Update the deployed Cloud Run server:
+    printf '%s' "<new1>,<new2>" | gcloud secrets create mcp-api-keys --data-file=-
+    gcloud run services update <service-name> --region <region> \
+      --update-secrets MCP_API_KEYS=mcp-api-keys:latest
+  (Quick alternative: --update-env-vars MCP_API_KEYS=<new1>,<new2>)
+- Send a request with an OLD key to the live server. It should get a 403.
+- Update any client that still uses the old keys.
+
+
+FIX 1b: REMOVE apikeys.env FROM GIT HISTORY (PROPOSED, NOT RUN)
+---------------------------------------------------------------
+- The leaked file appears in commits 6635f15 and a5fad7a, and is deleted
+  in dffc197. Every one of these is pushed to origin/main.
+- The leaked keys are found nowhere else in the history.
+- Do this only AFTER the keys are replaced. Rewriting history doesn't
+  make the old keys safe, because clones, forks and caches keep them.
+    pip install git-filter-repo
+    git filter-repo --path apikeys.env --invert-paths --force
+    git remote add origin https://github.com/Pr0gramm3r2022/System-and-Compute-MCP-Server
+    git log --all --oneline -- apikeys.env   # should print nothing
+    git push origin --force --all
+    git push origin --force --tags
+- Afterwards: re-clone every other copy of the repo, check for forks, and
+  if needed ask GitHub Support to purge cached views of the old commits.
+
+
+FIX 2: MAKE THE SERVER LOAD THE KEYS (PROPOSED)
+-----------------------------------------------
+- Problem: httpmcpserver/http_server.js never loads an env file, so
+  MCP_API_KEYS is empty and every request gets a 403.
+- Option A (recommended): in package.json, set
+    "start:http": "node --env-file=.env httpmcpserver/http_server.js"
+  This needs no new code and avoids the import-order problem in
+  middleware/auth.js, which reads the keys when it is first imported.
+- Option B: put import 'dotenv/config' as the very first line of
+  http_server.js. This breaks if someone reorders the imports.
+- Add a startup warning, or refuse to start, if MCP_API_KEYS is empty
+  and OAuth is off.
+
+
+FIX 3: MAKE THE CLIENT, SERVER AND RATE LIMITERS AGREE (PROPOSED)
+-----------------------------------------------------------------
+- lab/agents/http_client.js:6: exit with "MCP_API_KEY not set" instead
+  of falling back to 'your-api-key'.
+- middleware/ratelimit.js:17 and http_server.js:19 key on an x-api-key
+  header that no client sends. Key them on a hash of the Bearer token
+  instead.
+- Delete the unused `limiter` in http_server.js.
+
+
+FIX 4: TESTS AND CI (PROPOSED)
+------------------------------
+- Turn the npm test step back on in .github/workflows/ci.yml.
+- Remove the unrelated ANTHROPICKEY lines from tests/auth.apikey.test.js
+  and tests/auth.oauth.test.js.
+
+
+ORDER
+-----
+1. Finish Fix 1 (Cloud Run + test the old key).
+2. Fix 1b, if you want the history cleaned.
+3. Fix 2, then Fix 3, then Fix 4.
