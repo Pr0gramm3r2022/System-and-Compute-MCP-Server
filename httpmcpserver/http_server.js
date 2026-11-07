@@ -68,7 +68,8 @@ app.post('/messages', requireAuth, (req, res) => {
   const sessionId = req.query.sessionId;
   const transport = sessions.get(sessionId);
   if (!transport) return res.status(404).json({ error:'Session not found' });
-  transport.handlePostMessage(req, res);
+  // express.json() already consumed the body stream, so hand the parsed body to the transport
+  transport.handlePostMessage(req, res, req.body);
 });
  
 const PORT = process.env.PORT || 3000;
