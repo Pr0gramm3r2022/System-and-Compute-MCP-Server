@@ -47,7 +47,7 @@ export function registerDatabaseTools(server) {
       status: z.enum(['todo', 'in_progress', 'done', 'cancelled'])
     },
     async ({ id, status }) => {
-      db.prepare('UPDATE tasks SET status = ?, updated_at = date("now") WHERE id = ?').run(status, id);
+      db.prepare("UPDATE tasks SET status = ?, updated_at = date('now') WHERE id = ?").run(status, id);
       return { content: [{ type: 'text', text: `Task ${id} updated to ${status}` }] };
     }
   );
