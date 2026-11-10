@@ -1,0 +1,125 @@
+SESSION LOG - 2026-11-10 (REMOTE SERVER, EXCHANGERATE-API, STREAMABLE HTTP /mcp)
+================================================================================
+
+Session started around 20:40 UTC on 2026-11-10.
+Continues session_summary_2026-11-07_http_mcp_connect.txt and commit 77ec113
+(SSRF protection).
+No key values are written in this file.
+
+
+1. TRIED TO ADD THE CLOUD RUN SERVER WITH --transport http (FAILED)
+-------------------------------------------------------------------
+- The user's command had literal placeholder brackets:
+    claude mcp add --transport http <remote_server> <https://...run.app>
+  Bash reads `<` as input redirection, so the brackets had to be removed.
+- Ran it as:
+    claude mcp add --transport http remote_server \
+      https://mcp-server-996049909214.us-central1.run.app
+  Result: "MCP endpoint not found". The server had no Streamable HTTP
+  endpoint; it only offered the legacy SSE transport (/sse + /messages).
+- Removed the broken entry: claude mcp remove remote_server -s local
+
+
+2. GOT mcp-lab-local CONNECTED
+------------------------------
+- `\mcp` with a backslash is not a command. The slash command is `/mcp`.
+- The user re-ran `claude mcp add --transport sse mcp-lab-local ...` and got
+  "already exists in local config". The entry was already correct.
+- The real problem was ECONNREFUSED: nothing was listening on port 3000.
+- http_server.js does not load .env, so MCP_API_KEYS must be set in the
+  environment. Started it with:
+    MCP_API_KEYS=<test key> node httpmcpserver/http_server.js
+- `claude mcp get mcp-lab-local` -> Connected. User ran /mcp to reconnect.
+
+
+3. CALLED EXCHANGERATE-API THROUGH mcp-lab-local (SUCCESS, COMMITTED f7f5d53)
+-----------------------------------------------------------------------------
+- Tool: http_get, URL: https://open.er-api.com/v6/latest/USD (free, no key).
+- HTTP 200, "result":"success", 160+ currencies, base USD.
+- Also confirms the SSRF guard in lab/tools/web.js lets public URLs through.
+- Logged in test_output_2026-11-10_exchangerate_api.txt.
+
+
+4. CHECKED THE CLOUD RUN DEPLOYMENT
+-----------------------------------
+- URL: https://mcp-server-996049909214.us-central1.run.app
+- GET /health -> 200. GET /sse with no auth -> 401.
+- POST / and POST /mcp -> 404 (no Streamable HTTP endpoint).
+- GET / lists "/sse (requires x-api-key)". The current code only accepts
+  "Authorization: Bearer <key>" (middleware/auth.js), so the deployed build
+  is OLDER than the repo.
+
+
+5. ADDED A STREAMABLE HTTP /mcp ENDPOINT (DONE, COMMITTED ff71265)
+------------------------------------------------------------------
+- File: httpmcpserver/http_server.js
+- New: POST /mcp using StreamableHTTPServerTransport (MCP SDK 1.29.0),
+  behind the same requireAuth (Authorization: Bearer).
+- Stateless (sessionIdGenerator: undefined): a new McpServer + transport per
+  request, closed when the response closes. This works across multiple
+  Cloud Run instances without sticky sessions.
+- GET /mcp and DELETE /mcp -> 405 (nothing to stream or delete when stateless).
+- Tool registration moved into createServer(), shared by /mcp and /sse.
+- /sse and /messages unchanged. Root route now lists /mcp.
+- Tested on a temporary server on port 3001:
+    no auth -> 401, GET -> 405, initialize OK, tools/list -> all 13 tools,
+    tools/call multiply(6,7) -> "Result: 42".
+    `claude mcp add --transport http ... /mcp` -> Connected (test entry removed).
+    npm test -> 23/23 pass.
+- Editor warnings were all from older code: SSEServerTransport is
+  deprecated, and the `limiter` variable in http_server.js is never used.
+
+
+6. SWITCHED mcp-lab-local TO THE HTTP TRANSPORT
+-----------------------------------------------
+- Restarted the server on port 3000 with the new code (exit 143 on the old
+  process was from stopping it, not an error).
+- Ran:
+    claude mcp remove mcp-lab-local -s local
+    claude mcp add --transport http mcp-lab-local http://localhost:3000/mcp \
+      --header "Authorization: Bearer <test key>"
+- `claude mcp get mcp-lab-local` -> Connected, Type: http,
+  URL: http://localhost:3000/mcp
+- This is still LOCAL (localhost in the dev container). The server only runs
+  while the Claude Code session that started it is open.
+
+
+7. CLI MISTAKES SEEN THIS SESSION
+---------------------------------
+- `claude add --transport http ...`     -> "unknown option '--transport'"
+- `claude add mcp --transport http ...` -> same error
+  The correct order is `claude mcp add ...`.
+- The Cloud Run URL also needs /mcp at the end for --transport http.
+
+
+8. .dockerignore (DRAFT ONLY, COMMITTED AS potentialdockerignore.txt 68912e3)
+----------------------------------------------------------------------------
+- The repo had no .dockerignore. Dockerfile does `COPY . .`, so a plain
+  `docker build` would copy .env, apikeys.env and node_modules into the image.
+  (`gcloud run deploy --source` falls back to .gitignore, which already
+  excludes .env and apikeys.env.)
+- Drafted one that excludes secrets (*.env), node_modules, .git, .github,
+  .devcontainer, .vscode, tests, tools1, and the session/test log .txt files.
+- .devcontainer is excluded only because the production image doesn't use
+  it (smaller image, fewer cache busts). There's no security reason, so it's
+  fine to keep it.
+- The user renamed the file to potentialdockerignore.txt, so Docker does
+  NOT use it right now.
+- Known typo in it: line 13 reads `.gitignorewhy`. It should be `.gitignore`.
+- Not tested: Docker and gcloud are not installed in this container.
+
+
+STILL TO DO
+-----------
+1. Fix the `.gitignorewhy` typo and rename potentialdockerignore.txt to
+   .dockerignore if you want to use it.
+2. Redeploy to Cloud Run from a machine with gcloud:
+     gcloud run deploy mcp-server --source . --region us-central1
+   (Add --set-env-vars MCP_API_KEYS=<key> if the service doesn't have it.)
+3. Check that GET / on the Cloud Run URL lists /mcp.
+4. Connect the remote server:
+     claude mcp add --transport http remote_server \
+       https://mcp-server-996049909214.us-central1.run.app/mcp \
+       --header "Authorization: Bearer <key>"
+5. Optional: make the server load .env (import 'dotenv/config' or
+   node --env-file=.env) and add an `npm start` script.
