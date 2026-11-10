@@ -1,0 +1,199 @@
+Test run log — 2026-11-10
+Node v20.20.2
+Changes under test (uncommitted): lab/tools/web.js (SSRF guard for http_get),
+lab/tools/filesystem.js (safePath prefix fix), tests/ssrf_and_paths.test.js (new)
+
+Result: 7/7 pass for the new test file; 23/23 pass for the full suite.
+
+================================================================================
+$ node --test tests/ssrf_and_paths.test.js
+================================================================================
+TAP version 13
+# Subtest: internal addresses are blocked
+ok 1 - internal addresses are blocked
+  ---
+  duration_ms: 9.289541
+  ...
+# Subtest: public addresses are allowed
+ok 2 - public addresses are allowed
+  ---
+  duration_ms: 0.20361
+  ...
+# Subtest: validateUrl rejects metadata, loopback, bad schemes, credentials
+ok 3 - validateUrl rejects metadata, loopback, bad schemes, credentials
+  ---
+  duration_ms: 0.925949
+  ...
+# Subtest: metadata and routing headers are stripped
+ok 4 - metadata and routing headers are stripped
+  ---
+  duration_ms: 0.780628
+  ...
+# Subtest: literal internal IP is refused before connecting
+ok 5 - literal internal IP is refused before connecting
+  ---
+  duration_ms: 0.527755
+  ...
+# Subtest: hostname resolving to loopback is refused at DNS lookup
+ok 6 - hostname resolving to loopback is refused at DNS lookup
+  ---
+  duration_ms: 12.47981
+  ...
+# Subtest: safePath keeps paths inside ~/lab
+ok 7 - safePath keeps paths inside ~/lab
+  ---
+  duration_ms: 0.679599
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 123.87471
+
+================================================================================
+$ npm test
+================================================================================
+> mcpagentlab@1.0.0 test
+> node --test tests/
+
+TAP version 13
+# Subtest: no Authorization header -> 401
+ok 1 - no Authorization header -> 401
+  ---
+  duration_ms: 48.394062
+  ...
+# Subtest: non-Bearer scheme -> 401
+ok 2 - non-Bearer scheme -> 401
+  ---
+  duration_ms: 10.609668
+  ...
+# {"ts":"2026-11-10T19:25:57.736Z","event":"AUTH_SUCCESS","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"api_key"}
+# Subtest: valid first key -> 200
+ok 3 - valid first key -> 200
+  ---
+  duration_ms: 11.26936
+  ...
+# {"ts":"2026-11-10T19:25:57.747Z","event":"AUTH_SUCCESS","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"api_key"}
+# Subtest: valid second key (comma-separated list, whitespace trimmed) -> 200
+ok 4 - valid second key (comma-separated list, whitespace trimmed) -> 200
+  ---
+  duration_ms: 5.267103
+  ...
+# {"ts":"2026-11-10T19:25:57.750Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"api_key"}
+# Subtest: wrong key -> 403
+ok 5 - wrong key -> 403
+  ---
+  duration_ms: 3.993276
+  ...
+# {"ts":"2026-11-10T19:25:57.755Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"api_key"}
+# Subtest: wrong key of the same length -> 403
+ok 6 - wrong key of the same length -> 403
+  ---
+  duration_ms: 2.756506
+  ...
+# Subtest: empty Bearer token -> 401 (header value is trimmed to "Bearer")
+ok 7 - empty Bearer token -> 401 (header value is trimmed to "Bearer")
+  ---
+  duration_ms: 3.904269
+  ...
+# Subtest: missing header -> 401 with WWW-Authenticate pointing at metadata
+ok 8 - missing header -> 401 with WWW-Authenticate pointing at metadata
+  ---
+  duration_ms: 44.098661
+  ...
+# {"ts":"2026-11-10T19:25:58.455Z","event":"AUTH_SUCCESS","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"api_key"}
+# Subtest: API key still works when OAuth is enabled
+ok 9 - API key still works when OAuth is enabled
+  ---
+  duration_ms: 6.430165
+  ...
+# {"ts":"2026-11-10T19:25:58.490Z","event":"AUTH_SUCCESS","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","sub":"user-123"}
+# Subtest: valid JWT -> 200 and req.user populated
+ok 10 - valid JWT -> 200 and req.user populated
+  ---
+  duration_ms: 36.718871
+  ...
+# {"ts":"2026-11-10T19:25:58.501Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"jwt expired"}
+# Subtest: expired JWT -> 401 invalid_token
+ok 11 - expired JWT -> 401 invalid_token
+  ---
+  duration_ms: 9.410098
+  ...
+# {"ts":"2026-11-10T19:25:58.519Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"jwt audience invalid. expected: https://mcp.test"}
+# Subtest: wrong audience -> 401
+ok 12 - wrong audience -> 401
+  ---
+  duration_ms: 16.378088
+  ...
+# {"ts":"2026-11-10T19:25:58.525Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"jwt issuer invalid. expected: https://issuer.test/"}
+# Subtest: wrong issuer -> 401
+ok 13 - wrong issuer -> 401
+  ---
+  duration_ms: 6.130726
+  ...
+# {"ts":"2026-11-10T19:25:58.533Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"invalid signature"}
+# Subtest: signed by a different key -> 401
+ok 14 - signed by a different key -> 401
+  ---
+  duration_ms: 10.658299
+  ...
+# {"ts":"2026-11-10T19:25:58.547Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"invalid algorithm"}
+# Subtest: HS256 token (algorithm confusion) -> 401
+ok 15 - HS256 token (algorithm confusion) -> 401
+  ---
+  duration_ms: 11.342226
+  ...
+# {"ts":"2026-11-10T19:25:58.553Z","event":"AUTH_FAILURE","ip":"::ffff:127.0.0.1","path":"/protected","ua":"node","method":"oauth","reason":"Invalid token structure"}
+# Subtest: garbage token -> 401
+ok 16 - garbage token -> 401
+  ---
+  duration_ms: 5.40983
+  ...
+# Subtest: internal addresses are blocked
+ok 17 - internal addresses are blocked
+  ---
+  duration_ms: 8.304104
+  ...
+# Subtest: public addresses are allowed
+ok 18 - public addresses are allowed
+  ---
+  duration_ms: 0.204331
+  ...
+# Subtest: validateUrl rejects metadata, loopback, bad schemes, credentials
+ok 19 - validateUrl rejects metadata, loopback, bad schemes, credentials
+  ---
+  duration_ms: 0.910771
+  ...
+# Subtest: metadata and routing headers are stripped
+ok 20 - metadata and routing headers are stripped
+  ---
+  duration_ms: 0.779876
+  ...
+# Subtest: literal internal IP is refused before connecting
+ok 21 - literal internal IP is refused before connecting
+  ---
+  duration_ms: 0.527424
+  ...
+# Subtest: hostname resolving to loopback is refused at DNS lookup
+ok 22 - hostname resolving to loopback is refused at DNS lookup
+  ---
+  duration_ms: 12.405651
+  ...
+# Subtest: safePath keeps paths inside ~/lab
+ok 23 - safePath keeps paths inside ~/lab
+  ---
+  duration_ms: 0.645245
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1256.65057

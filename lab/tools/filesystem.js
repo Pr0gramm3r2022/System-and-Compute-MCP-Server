@@ -2,7 +2,7 @@
 import { z } from 'zod'; //  Fixed
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 // ... rest of file remains the same
-import { join, resolve, dirname } from 'path';
+import { join, resolve, dirname, sep } from 'path';
 import { homedir } from 'os';
 import { logger } from '../logger.js';
 
@@ -18,9 +18,11 @@ if (!existsSync(LAB_ROOT)) {
  * Security Helper: Resolves paths and prevents directory traversal attacks.
  * Using resolve() is safer than join() because it handles '..' segments properly.
  */
-function safePath(p) {
+export function safePath(p) {
     const resolved = resolve(LAB_ROOT, p);
-    if (!resolved.startsWith(LAB_ROOT)) {
+    // Compare against LAB_ROOT + separator so sibling dirs like ~/lab-other
+    // (which share the "~/lab" prefix) are rejected too.
+    if (resolved !== LAB_ROOT && !resolved.startsWith(LAB_ROOT + sep)) {
         throw new Error('Path traversal blocked: Access outside of ~/lab/ is prohibited.');
     }
     return resolved;
