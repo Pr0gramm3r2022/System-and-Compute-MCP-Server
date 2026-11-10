@@ -1,0 +1,28 @@
+# Secrets — never bake into the image; set via Cloud Run env vars instead
+.env
+.env.*
+*.env
+apikeys.env
+
+# Installed inside the image by `npm install`
+node_modules
+**/node_modules
+
+# VCS, CI and editor config
+.git
+.gitignorewhy
+.github
+.devcontainer
+.vscode
+.dockerignore
+Dockerfile
+
+# Not needed at runtime
+tests
+tools1
+session_summary_*.txt
+session_changes_summary.txt
+test_output_*.txt
+file_descriptions.txt
+README.md
+LICENSE
