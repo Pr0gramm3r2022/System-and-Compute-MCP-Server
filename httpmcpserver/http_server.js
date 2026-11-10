@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { requireAuth } from '../middleware/auth.js';
 import { protectedResourceMetadata } from '../middleware/oauth.js';
 import { globalLimiter } from '../middleware/ratelimit.js';
@@ -32,7 +33,12 @@ app.use(globalLimiter);
 app.get('/', (_, res) => res.json({
   status: 'ok',
   message: 'HTTP MCP Server is running',
-  routes: ['/health', '/sse (requires Authorization: Bearer)', '/messages (POST, requires Authorization: Bearer)']
+  routes: [
+    '/health',
+    '/mcp (POST, Streamable HTTP, requires Authorization: Bearer)',
+    '/sse (legacy SSE, requires Authorization: Bearer)',
+    '/messages (POST, legacy SSE, requires Authorization: Bearer)'
+  ]
 }));
 
 // Health check (no auth required)
@@ -40,18 +46,52 @@ app.get('/health', (_, res) => res.json({ status:'ok', ts:new Date().toISOString
 
 // OAuth discovery for MCP clients (no auth required)
 app.get('/.well-known/oauth-protected-resource', protectedResourceMetadata);
- // Session store: one McpServer instance per active SSE connection
-const sessions = new Map();
- 
-// SSE endpoint: client connects here first
-app.get('/sse', requireAuth, (req, res) => {
+
+function createServer() {
   const server = new McpServer({ name:'mcp-lab-server', version:'1.0.0' });
   registerComputeTools(server);
   registerFilesystemTools(server);
   registerDatabaseTools(server);
   registerWebTools(server);
   registerSystemTools(server);
- 
+  return server;
+}
+
+// Streamable HTTP endpoint (current MCP transport).
+// Stateless: a fresh server + transport per request, so it works across
+// multiple Cloud Run instances without sticky sessions.
+app.post('/mcp', requireAuth, async (req, res) => {
+  const server = createServer();
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on('close', () => {
+    transport.close();
+    server.close();
+  });
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error('MCP request error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ jsonrpc:'2.0', error:{ code:-32603, message:'Internal server error' }, id:null });
+    }
+  }
+});
+
+// Stateless mode has no server-initiated stream or session to delete.
+const methodNotAllowed = (_, res) => res.status(405).set('Allow', 'POST').json({
+  jsonrpc:'2.0', error:{ code:-32000, message:'Method not allowed.' }, id:null
+});
+app.get('/mcp', methodNotAllowed);
+app.delete('/mcp', methodNotAllowed);
+
+// Session store: one McpServer instance per active SSE connection
+const sessions = new Map();
+
+// SSE endpoint (legacy transport): client connects here first
+app.get('/sse', requireAuth, (req, res) => {
+  const server = createServer();
+
   const transport = new SSEServerTransport('/messages', res);
   sessions.set(transport.sessionId, transport);
  
