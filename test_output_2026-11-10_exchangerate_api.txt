@@ -1,0 +1,64 @@
+ExchangeRate-API call log — 2026-11-10
+Called via: MCP server "mcp-lab-local" (SSE transport) -> tool http_get
+Server: httpmcpserver/http_server.js, run locally on http://localhost:3000/sse
+        started with MCP_API_KEYS=test-key-123
+Client auth header: Authorization: Bearer test-key-123
+
+Result: SUCCESS — HTTP 200, "result":"success"
+This also confirms the SSRF guard in lab/tools/web.js lets public URLs through.
+
+================================================================================
+Setup
+================================================================================
+1. `claude mcp add --transport sse mcp-lab-local http://localhost:3000/sse ...`
+   -> "already exists in local config" (the entry was already correct)
+2. `claude mcp get mcp-lab-local` -> ✘ ECONNREFUSED (nothing on :3000)
+3. Started server: MCP_API_KEYS=test-key-123 node httpmcpserver/http_server.js
+   GET /health -> {"status":"ok"}
+4. `claude mcp get mcp-lab-local` -> ✔ Connected
+5. /mcp -> "Reconnected to mcp-lab-local."
+
+================================================================================
+Request
+================================================================================
+Tool:   mcp__mcp-lab-local__http_get
+Input:  { "url": "https://open.er-api.com/v6/latest/USD" }
+(Free open-access endpoint, no API key required.)
+
+================================================================================
+Response
+================================================================================
+status:                200
+result:                success
+provider:              https://www.exchangerate-api.com
+base_code:             USD
+time_last_update_utc:  Tue, 10 Nov 2026 00:02:31 +0000
+time_next_update_utc:  Wed, 11 Nov 2026 00:31:41 +0000
+currencies returned:   160+
+
+Selected rates (1 USD =):
+  EUR   0.892449
+  GBP   0.744696
+  JPY   158.023471
+  CAD   1.411275
+  AUD   1.448015
+  CHF   0.81965
+  CNY   6.686583
+  INR   93.929192
+  MXN   18.57202
+  BRL   5.512234
+  KRW   1344.786283
+  SGD   1.279506
+  HKD   7.84232
+  ZAR   16.406164
+  NGN   1349.070025
+
+================================================================================
+Notes
+================================================================================
+- mcp-lab-local runs only on localhost; it stops when the dev session ends.
+- Cloud Run deployment (https://mcp-server-996049909214.us-central1.run.app)
+  checked separately: /health -> 200, /sse without auth -> 401. It is not yet
+  registered as an MCP server in Claude Code.
+- The server does not load .env, so MCP_API_KEYS must be set in the
+  environment when starting it.
