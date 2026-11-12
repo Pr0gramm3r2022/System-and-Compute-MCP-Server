@@ -1,65 +1,33 @@
-name: MCP Lab CI
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPICKEY }}
-          MCP_API_KEYS: 'test-key-123'
-        run: npm test -- --forceExit
-
-      - name: Run HTTP Server Integration Tests
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MCP_API_KEYS: 'test-key-123'
-          PORT: 3000
-        run: |
-          # 1. Start the HTTP server in the background
-          node mcp-server/http_server.js &
-          SERVER_PID=$!
-
-          # 2. Give it a moment to boot up and verify health endpoint
-          sleep 2
-          curl -f http://localhost:3000/health || exit 1
-
-          # 3. Run your HTTP integration test suite
-          MCP_SERVER_URL=http://localhost:3000 MCP_API_KEY=test-key-123 npx jest tests/integration/http_server.test.js --forceExit
-
-          # 4. Kill the background server process
-          kill $SERVER_PID
-
-  deploy:
+deploy:
     needs: test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      - name: Deploy to production
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST:    ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_USER:    ${{ secrets.DEPLOY_USER }}
+
+      # 1. Authenticate to Google Cloud
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      # 2. Set up Google Cloud SDK
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      # 3. Build and push container image using Cloud Build (Module 8.5.3)
+      - name: 'Build and Push to Container Registry'
         run: |
-          echo "$DEPLOY_SSH_KEY" > /tmp/deploy_key && chmod 600 /tmp/deploy_key
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
-            $DEPLOY_USER@$DEPLOY_HOST \
-            'cd ~/lab && git pull && npm ci && pm2 restart mcp-server'
+          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/mcp-server
+
+      # 4. Deploy to Cloud Run
+      - name: 'Deploy to Cloud Run'
+        run: |
+          gcloud run deploy mcp-server \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/mcp-server \
+            --platform managed \
+            --region us-central1 \
+            --port 3000 \
+            --no-allow-unauthenticated \
+            --set-env-vars NODE_ENV=production,PORT=3000 \
+            --set-secrets ANTHROPIC_API_KEY=anthropic-key:latest,MCP_API_KEYS=mcp-keys:latest
