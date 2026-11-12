@@ -34,7 +34,7 @@ export async function requireAuth(req, res, next) {
   }
 
   if (oauthEnabled) {
-    try {
+        try {
       req.user = await validateJwt(provided);
       auditLog('AUTH_SUCCESS', req, { method: 'oauth', sub: req.user.sub });
       return next();
