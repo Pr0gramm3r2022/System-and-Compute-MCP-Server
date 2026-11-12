@@ -5,7 +5,7 @@
   "description": "building an MCP server from docs, integrating it with claude code, and deploying it. building with MCP SDK and Anthropic SDK",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/"
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "keywords": [],
   "author": "",
