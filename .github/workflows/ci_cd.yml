@@ -35,16 +35,13 @@ jobs:
           PORT: 3000
         run: |
           # 1. Start the HTTP server in the background
-          node mcp-server/http_server.js &
+          node httpmcpserver/http_server.js &
           SERVER_PID=$!
-
           # 2. Verify health endpoint is reachable
           sleep 2
           curl -f http://localhost:3000/health || exit 1
-
-          # 3. Run the HTTP/SSE integration test suite
-          MCP_SERVER_URL=http://localhost:3000 MCP_API_KEY=test-key-123 npx jest tests/integration/http_server.test.js --forceExit
-
+          # 3. Run the HTTP/SSE integration test suite (Updated path and Node vm-modules flag)
+          MCP_SERVER_URL=http://localhost:3000 MCP_API_KEY=test-key-123 node --experimental-vm-modules node_modules/.bin/jest testsuite/tests.js --forceExit
           # 4. Stop the background server process
           kill $SERVER_PID
 
