@@ -1,3 +1,4 @@
+//import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -12,6 +13,7 @@ import { registerDatabaseTools }   from '../lab/tools/database.js';
 import { registerWebTools }        from '../lab/tools/web.js';
 import { registerSystemTools }     from '../lab/tools/system.js';
 //rewrote file paths using grep
+//dotenv.config();
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
  
 const limiter = rateLimit({

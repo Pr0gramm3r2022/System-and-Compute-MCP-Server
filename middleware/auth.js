@@ -90,7 +90,7 @@ function isValidApiKey(provided) {
   return false;
 }
 
-export async function requireAuth(req, res, next) {
+/*export async function requireAuth(req, res, next) {
   const authHeader = req.headers['authorization'] || '';
   if (!authHeader.startsWith('Bearer ')) {
     if (oauthEnabled) res.set('WWW-Authenticate', wwwAuthenticate(req));
@@ -101,7 +101,26 @@ export async function requireAuth(req, res, next) {
   if (isValidApiKey(provided)) {
     auditLog('AUTH_SUCCESS', req, { method: 'api_key' });
     return next();
+  }*/
+
+   export function requireAuth(req, res, next) {
+  // Read dynamically on every request so it picks up the active environment
+  const allowedKeys = process.env.MCP_API_KEYS 
+    ? process.env.MCP_API_KEYS.split(',').map(k => k.trim()) 
+    : [process.env.MCP_API_KEY].filter(Boolean);
+
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized: Missing or invalid token format' });
   }
+
+  const token = authHeader.split(' ')[1];
+  if (!allowedKeys.includes(token)) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid API key' });
+  }
+
+  next();
+} 
 
   if (oauthEnabled) {
     try {
@@ -117,7 +136,7 @@ export async function requireAuth(req, res, next) {
 
   auditLog('AUTH_FAILURE', req, { method: 'api_key' });
   return res.status(403).json({ error: 'Invalid API key' });
-}
+//was an ending curly bracket here
 
 function auditLog(event, req, extra = {}) {
   process.stderr.write(JSON.stringify({
@@ -129,4 +148,7 @@ function auditLog(event, req, extra = {}) {
     ...extra,
   }) + '\n');
 }
+
+console.log("Expected Keys:", process.env.MCP_API_KEYS);
+console.log("Received Auth Header:", req.headers['authorization']);
 

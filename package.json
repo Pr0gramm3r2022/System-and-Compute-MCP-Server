@@ -7,6 +7,13 @@
   "scripts": {
     "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
+
+  "jest": {
+  "testMatch": [
+    "**/testsuite/**/*.js",
+    "**/tests/**/*.js"
+  ]
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
