@@ -1,7 +1,7 @@
 name: MCP Lab CI
 
 on:
-  workflow_dispatch:   # Allows manual trigger from the GitHub Actions UI
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -40,7 +40,7 @@ jobs:
           # 2. Verify health endpoint is reachable
           sleep 2
           curl -f http://localhost:3000/health || exit 1
-          # 3. Run the HTTP/SSE integration test suite (Updated path and Node vm-modules flag)
+          # 3. Run the HTTP/SSE integration test suite
           MCP_SERVER_URL=http://localhost:3000 MCP_API_KEY=test-key-123 node --experimental-vm-modules node_modules/.bin/jest testsuite/tests.js --forceExit
           # 4. Stop the background server process
           kill $SERVER_PID
@@ -52,22 +52,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Authenticate to Google Cloud using your Service Account JSON secret
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      # 2. Set up the Google Cloud SDK CLI on the runner
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
 
-      # 3. Build and push container image using Cloud Build (Module 8.5.3)
       - name: 'Build and Push to Container Registry'
         run: |
           gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/mcp-server
 
-      # 4. Deploy the updated image to Cloud Run securely
       - name: 'Deploy to Cloud Run'
         run: |
           gcloud run deploy mcp-server \
