@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MCP_API_KEYS: 'test-key-123'
+        run: npm test -- --forceExit
+
+      - name: Run HTTP Server Integration Tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MCP_API_KEYS: 'test-key-123'
+          PORT: 3000
+        run: |
+          node httpmcpserver/http_server.js &
+          SERVER_PID=$!
+          sleep 2
+          curl -f http://localhost:3000/health || exit 1
+          MCP_SERVER_URL=http://localhost:3000 MCP_API_KEY=test-key-123 node --experimental-vm-modules node_modules/.bin/jest testsuite/tests.js --forceExit
+          kill $SERVER_PID
