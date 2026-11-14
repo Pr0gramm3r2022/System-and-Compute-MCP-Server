@@ -9,11 +9,16 @@
   },
 
   "jest": {
-  "testMatch": [
-    "**/testsuite/**/*.js",
-    "**/tests/**/*.js"
-  ]
-},
+    "testMatch": [
+      "**/testsuite/**/*.test.js",
+      "**/tests/**/*.test.js"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!jwks-rsa|jose)"
+    ]
+  },
+
+
   "keywords": [],
   "author": "",
   "license": "ISC",
