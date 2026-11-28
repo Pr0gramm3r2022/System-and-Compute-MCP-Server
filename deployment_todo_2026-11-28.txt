@@ -1,0 +1,241 @@
+DEPLOYMENT TODO: Make the remote HTTP MCP server (Cloud Run) reachable from Claude Code
+Date: 2026-11-28
+Service: mcp-server (us-central1)
+URL:     https://mcp-server-996049909214.us-central1.run.app
+
+==========================================================================================
+0. CURRENT STATE (found by probing the live service)
+==========================================================================================
+
+  GET  /                                        200  lists only /health, /sse, /messages (x-api-key)
+  GET  /health                                  200  OK
+  GET  /.well-known/oauth-protected-resource    404
+  POST /mcp                                     404  "Cannot POST /mcp"
+
+  So the live service is running an OLD build that only has the legacy SSE transport.
+  The local code in httpmcpserver/http_server.js already has:
+    - POST /mcp (stateless Streamable HTTP; GET and DELETE return 405)
+    - /.well-known/oauth-protected-resource
+    - Bearer auth on /mcp, /sse, /messages (middleware/auth.js)
+  That code (commits ff712656 and 207e2e1a) was never deployed.
+
+  Why CI never deployed it: .github/workflows/ci_cd.yml runs
+  `jest testsuite/tests.js`, but that file was renamed to testsuite/tests.test.js.
+  So the test job fails and the deploy job (needs: test) never runs.
+
+  Claude Code config (~/.claude.json, project scope) has two problems:
+    - "compute-server" points at the root URL, not /mcp
+    - "compute-server" sends no Authorization header
+
+==========================================================================================
+1. BLOCKERS: fix BEFORE deploying
+==========================================================================================
+
+[ ] 1.1 Create a real .dockerignore (SECURITY, HIGH PRIORITY)
+      - The repo has no .dockerignore, and the Dockerfile runs `COPY . .`.
+        That means apikeys.env, .env, node_modules, .git, session logs, etc.
+        get baked into the container image.
+      - A ready-made draft already exists: potentialdockerignore.txt
+        Action:  git mv potentialdockerignore.txt .dockerignore
+      - Fix the typo in the draft: ".gitignorewhy" should be ".gitignore".
+      - Optional: also exclude testsuite/, lab/session-log.txt, lab/node_modules.
+      - Check the result after building:
+          docker build -t mcp-test . && docker run --rm mcp-test ls -la /app
+        Make sure apikeys.env and .env are NOT there.
+      - The current live image was probably built without a .dockerignore too,
+        so assume the keys in apikeys.env may already be in that image.
+        Consider rotating them (see 1.4).
+
+[ ] 1.2 Decide on Cloud Run ingress auth vs. app-level auth (CONFLICT)
+      - ci_cd.yml deploys with --no-allow-unauthenticated. That makes Cloud Run
+        IAM require a Google identity token in the Authorization header, BEFORE
+        the request reaches Express.
+      - The app ALSO expects "Authorization: Bearer <MCP API key or OAuth JWT>".
+        Both cannot use the same header, so Claude Code would get 401/403 from
+        Google and never reach requireAuth.
+      - The live service currently allows unauthenticated access (probes got 200),
+        and app-level auth protects /mcp.
+      - Recommended: use --allow-unauthenticated and let middleware/auth.js
+        handle auth. Update ci_cd.yml to match.
+        (Alternative: keep IAM and put a proxy in front. That's more complex.)
+
+[ ] 1.3 Fix the CI test path so the pipeline can pass
+      - .github/workflows/ci_cd.yml line 48: testsuite/tests.js should be testsuite/tests.test.js
+      - MCP_CI.yml already uses tests.test.js.
+      - Note: ci_cd.yml, MCP_CI.yml and ci.yml all trigger on push to main, and
+        jest testMatch already picks up testsuite/**/*.test.js in the unit step,
+        so tests.test.js runs twice. Consider consolidating to ONE workflow.
+      - Commit or stash the uncommitted change in testsuite/tests.test.js first.
+
+[ ] 1.4 Prepare secrets in Google Secret Manager
+      - MCP_API_KEYS comes from secret "mcp-keys" (comma-separated list of keys).
+        Confirm it exists and has the key(s) Claude Code will use:
+          gcloud secrets versions access latest --secret=mcp-keys
+      - ANTHROPIC_API_KEY comes from secret "anthropic-key".
+      - The Cloud Run service account needs roles/secretmanager.secretAccessor
+        on both secrets.
+      - If you rotate keys, add a new secret version and update apikeys.env
+        locally and the Claude Code config.
+      - Optional OAuth (only if you want JWT auth in addition to API keys):
+          OAUTH_JWKS_URI, OAUTH_AUDIENCE, OAUTH_ISSUER, MCP_RESOURCE_URL
+          (MCP_RESOURCE_URL should be the public https URL, because Cloud Run
+           terminates TLS and req.protocol may report "http".)
+
+[ ] 1.5 Container Registry deprecation
+      - ci_cd.yml pushes to gcr.io/... Google Container Registry has been
+        shut down in favor of Artifact Registry. Check that gcr.io still works
+        for this project (it may be redirected to Artifact Registry). If it
+        doesn't, switch to:
+          us-central1-docker.pkg.dev/<PROJECT_ID>/<REPO>/mcp-server
+      - Also tag images with the commit SHA (not just :latest) so every
+        revision maps to a known commit:
+          --tag .../mcp-server:${{ github.sha }}
+
+==========================================================================================
+2. LOCAL VERIFICATION: before touching Cloud Run
+==========================================================================================
+
+[ ] 2.1 Run the unit tests
+        MCP_API_KEYS=test-key-123 npm test -- --forceExit
+
+[ ] 2.2 Start the HTTP server locally
+        MCP_API_KEYS=test-key-123 node httpmcpserver/http_server.js
+      (This also brings the "mcp-lab-local" entry, http://localhost:3000/mcp,
+       online. Its Bearer key must be in MCP_API_KEYS.)
+
+[ ] 2.3 Smoke-test /mcp with curl
+        curl -s -X POST http://localhost:3000/mcp \
+          -H 'Authorization: Bearer test-key-123' \
+          -H 'Content-Type: application/json' \
+          -H 'Accept: application/json, text/event-stream' \
+          -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+      Expected: 200 with serverInfo "mcp-lab-server".
+      Also check: no header returns 401, wrong key returns 403, GET /mcp returns 405.
+
+[ ] 2.4 Build and run the Docker image locally (same as Cloud Run)
+        docker build -t mcp-test .
+        docker run --rm -p 3000:3000 -e MCP_API_KEYS=test-key-123 mcp-test
+      Repeat the curl from 2.3. Confirms better-sqlite3 compiles in the image
+      and the tool modules load from /app/lab/tools.
+
+==========================================================================================
+3. DEPLOY: safely, with rollback ready
+==========================================================================================
+
+[ ] 3.1 Record the currently serving revision (your rollback target)
+        gcloud run revisions list --service mcp-server --region us-central1
+      Write it down here:  OLD_REVISION = ______________________
+
+[ ] 3.2 Deploy the new revision with NO traffic
+        gcloud run deploy mcp-server --source . --region us-central1 \
+          --no-traffic --tag candidate \
+          --allow-unauthenticated \
+          --set-env-vars NODE_ENV=production \
+          --set-secrets ANTHROPIC_API_KEY=anthropic-key:latest,MCP_API_KEYS=mcp-keys:latest
+      (Do NOT set PORT. Cloud Run injects it, and setting it explicitly is rejected.
+       The app already reads process.env.PORT.)
+
+[ ] 3.3 Test the candidate URL
+        C=https://candidate---mcp-server-996049909214.us-central1.run.app
+        curl $C/health
+        curl $C/                       (should now list /mcp)
+        curl $C/.well-known/oauth-protected-resource
+        (and the initialize POST from 2.3 against $C/mcp with your real key)
+
+[ ] 3.4 Promote it
+        gcloud run services update-traffic mcp-server --region us-central1 --to-latest
+
+[ ] 3.5 ROLLBACK (only if something breaks)
+        gcloud run services update-traffic mcp-server --region us-central1 \
+          --to-revisions OLD_REVISION=100
+      Env vars and secret bindings are saved with each revision, so rolling back
+      restores the old config too. Don't delete OLD_REVISION until the new one
+      has been stable for a while.
+
+==========================================================================================
+4. CLAUDE CODE CONFIGURATION
+==========================================================================================
+
+[ ] 4.1 Update the "compute-server" entry (~/.claude.json, project scope),
+      or remove it and re-add it with the CLI:
+        claude mcp remove compute-server
+        claude mcp add --transport http compute-server \
+          https://mcp-server-996049909214.us-central1.run.app/mcp \
+          --header "Authorization: Bearer <KEY FROM mcp-keys SECRET>"
+
+[ ] 4.2 Restart Claude Code (or run /mcp) and confirm compute-server shows
+      "connected" with its tools listed (add, sqrt, read_file, http_get, ...).
+
+[ ] 4.3 Optionally move the config to a project .mcp.json using env-var expansion
+      so the key isn't hard-coded:
+        "headers": { "Authorization": "Bearer ${MCP_REMOTE_KEY}" }
+
+==========================================================================================
+5. BREAKING CHANGES / COMPATIBILITY
+==========================================================================================
+
+[ ] 5.1 Legacy SSE clients change auth method
+      - Old build: /sse and /messages used the "x-api-key" header.
+      - New build: they require "Authorization: Bearer <key>".
+      - Any existing client (agents in lab/agents, scripts, other machines)
+        using x-api-key will start getting 401. Update them or add temporary
+        x-api-key support to requireAuth.
+
+[ ] 5.2 Legacy SSE doesn't work reliably on multi-instance Cloud Run
+      - The sessions Map is in memory. If Cloud Run scales to more than one
+        instance, the POST /messages can land on a different instance than the
+        GET /sse and return "Session not found".
+      - Either set --max-instances=1 or --session-affinity, or deprecate SSE and
+        use only /mcp (which is stateless and fine to scale).
+
+[ ] 5.3 The rate limiter key changes
+      - The unused `limiter` in http_server.js keys on x-api-key. It is defined
+        but never applied (only globalLimiter is used). Remove it or key it on
+        the Bearer token.
+      - With 'trust proxy' = 1, Cloud Run's front end supplies X-Forwarded-For,
+        so per-IP limiting should work. Verify it after deploying.
+
+==========================================================================================
+6. SECURITY REVIEW OF EXPOSED TOOLS (internet-facing)
+==========================================================================================
+
+[ ] 6.1 These tools are exposed to anyone holding a valid key:
+        write_file, delete_file, read_file, list_directory, http_get,
+        system_info, database tools.
+      - The filesystem tools are sandboxed by safePath() in lab/tools/filesystem.js.
+        Confirm the sandbox root resolves correctly inside the container (/app/lab),
+        and that it can't reach /app/apikeys.env or other secrets.
+      - http_get: confirm the SSRF protections (testsuite/ssrf_and_paths.test.js)
+        block 169.254.169.254, the GCP metadata server. Otherwise a caller could
+        steal the service account token.
+      - system_info: check it doesn't expose environment variables (secrets).
+
+[ ] 6.2 Cloud Run storage is temporary and per instance
+      - Files written with write_file and any SQLite DB disappear on restart and
+        aren't shared across instances. If persistence matters, use Cloud SQL
+        (pg is already a dependency) or GCS.
+
+==========================================================================================
+7. CLEANUP (nice to have)
+==========================================================================================
+
+[ ] 7.1 middleware/auth.js has ~250 lines of commented-out old versions. Delete them
+      (git history keeps them).
+[ ] 7.2 http_server.js: remove the commented dotenv lines, or enable dotenv only
+      when NODE_ENV !== 'production'.
+[ ] 7.3 Root package.json and lab/package.json pin different versions of zod (4 vs 3),
+      @anthropic-ai/sdk and @modelcontextprotocol/sdk. The Dockerfile copies
+      lab/package.json but only runs `npm install` at the root, so lab/'s
+      versions aren't installed in the image. Consolidate to one package.json,
+      or verify the tools work with the root versions (2.4 covers this).
+[ ] 7.4 Dockerfile: use `npm ci --omit=dev` with package-lock.json copied, for
+      reproducible, smaller builds. jest is currently a runtime dependency;
+      move it to devDependencies.
+[ ] 7.5 Update README.md with the remote endpoint, auth scheme, and
+      Claude Code setup command (4.1).
+
+==========================================================================================
+SUGGESTED ORDER
+==========================================================================================
+  1.1 -> 1.3 -> 2.1 -> 2.2 -> 2.3 -> 2.4 -> 1.2 -> 1.4 -> 6.1 -> 3.1 -> 3.2 -> 3.3
+  -> 3.4 -> 4.1 -> 4.2 -> 5.x -> 1.5 -> 7.x

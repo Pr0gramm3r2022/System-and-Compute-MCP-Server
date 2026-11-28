@@ -1,5 +1,4 @@
 // ~/lab/tests/integration/http_server.test.js
-
 // ~/lab/tests/integration/http_server.test.js
 import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
